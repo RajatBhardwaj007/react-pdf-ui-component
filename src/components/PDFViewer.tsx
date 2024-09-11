@@ -1,91 +1,132 @@
-// src/components/PDFViewer.tsx
-
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import './PDFViewer.css'; // Add custom styles if needed
+import 'react-pdf/dist/esm/Page/TextLayer.css';
+import './PDFViewer.css';
 
-// Set up PDF.js worker (necessary for rendering PDFs)
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 interface PDFViewerProps {
-    pdfUrl: string;
+  pdfUrl: string;
+}
+
+interface SearchResult {
+  pageIndex: number;
+  matchIndex: number;
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
-    const [numPages, setNumPages] = useState<number | null>(null);
-    const [pageNumber, setPageNumber] = useState<number>(1);
-    const [searchTerm, setSearchTerm] = useState<string>('');
-    const [foundText, setFoundText] = useState<boolean>(false);
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [searchText, setSearchText] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [currentResultIndex, setCurrentResultIndex] = useState<number>(-1);
 
-    const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-        setNumPages(numPages);
-    }, []);
+  const pdfDocument = useRef<pdfjs.PDFDocumentProxy | null>(null);
 
-    const goToPrevPage = () => {
-        if (pageNumber > 1) setPageNumber(pageNumber - 1);
-    };
+  const onDocumentLoadSuccess = useCallback((document: pdfjs.PDFDocumentProxy) => {
+    setNumPages(document.numPages);
+    pdfDocument.current = document;
+  }, []);
 
-    const goToNextPage = () => {
-        if (numPages && pageNumber < numPages) setPageNumber(pageNumber + 1);
-    };
+  const highlightPattern = (text: string, pattern: string) => {
+    if (!pattern.trim()) return text;
+    const regex = new RegExp(`(${pattern})`, 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+  };
 
-    const handleSearch = () => {
-        setFoundText(false);
+  const textRenderer = useCallback(
+    (textItem: any) => highlightPattern(textItem.str, searchText),
+    [searchText]
+  );
 
-        const textLayer = document.querySelector(`.react-pdf__Page__textContent`);
-        if (textLayer && searchTerm.trim()) {
-            const range = document.createRange();
-            const selection = window.getSelection();
+  const handleSearch = async () => {
+    if (!pdfDocument.current || !searchText.trim()) {
+      setSearchResults([]);
+      return;
+    }
 
-            textLayer.querySelectorAll('span').forEach((span: Element) => {
-                if (span.textContent?.toLowerCase().includes(searchTerm.toLowerCase())) {
-                    setFoundText(true);
-                    range.selectNodeContents(span);
-                    selection?.removeAllRanges();
-                    selection?.addRange(range);
-                    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            });
-        }
-    };
+    const results: SearchResult[] = [];
 
-    return (
-        <div className="pdf-viewer">
-            <div style={{ marginBottom: '20px' }}>
-                <input
-                    type="text"
-                    placeholder="Search in PDF"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ marginRight: '10px' }}
-                />
-                <button onClick={handleSearch}>Search</button>
-                {foundText ? <span>Text found!</span> : <span>No results found</span>}
-            </div>
+    for (let i = 1; i <= (numPages || 0); i++) {
+      const page = await pdfDocument.current.getPage(i);
+      const textContent = await page.getTextContent();
+      const text = textContent.items.map((item: any) => item.str).join(' ');
 
-            <div>
-                <button onClick={goToPrevPage} disabled={pageNumber === 1}>
-                    Previous
-                </button>
-                <span>
-                    Page {pageNumber} of {numPages}
-                </span>
-                <button onClick={goToNextPage} disabled={pageNumber === numPages}>
-                    Next
-                </button>
-            </div>
+      const regex = new RegExp(searchText, 'gi');
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        results.push({ pageIndex: i, matchIndex: match.index });
+      }
+    }
 
-            <div style={{ border: '1px solid black', marginTop: '20px' }}>
-                <Document
-                    file={pdfUrl}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                >
-                    <Page pageNumber={pageNumber} />
-                </Document>
-            </div>
-        </div>
-    );
+    setSearchResults(results);
+    setCurrentResultIndex(results.length > 0 ? 0 : -1);
+    if (results.length > 0) {
+      setPageNumber(results[0].pageIndex);
+    }
+  };
+
+  const navigateSearchResult = (direction: 'next' | 'prev') => {
+    if (searchResults.length === 0) return;
+
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = (currentResultIndex + 1) % searchResults.length;
+    } else {
+      newIndex = (currentResultIndex - 1 + searchResults.length) % searchResults.length;
+    }
+
+    setCurrentResultIndex(newIndex);
+    setPageNumber(searchResults[newIndex].pageIndex);
+  };
+
+  return (
+    <div className="pdf-viewer">
+      <div style={{ marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Search in PDF"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{ marginRight: '10px' }}
+        />
+        <button onClick={handleSearch}>Search</button>
+        <span>
+          {searchResults.length > 0
+            ? `${currentResultIndex + 1} of ${searchResults.length} results`
+            : 'No results'}
+        </span>
+        <button onClick={() => navigateSearchResult('prev')} disabled={searchResults.length === 0}>
+          Previous Result
+        </button>
+        <button onClick={() => navigateSearchResult('next')} disabled={searchResults.length === 0}>
+          Next Result
+        </button>
+      </div>
+
+      <div>
+        <button onClick={() => setPageNumber(Math.max(1, pageNumber - 1))} disabled={pageNumber === 1}>
+          Previous Page
+        </button>
+        <span>
+          Page {pageNumber} of {numPages}
+        </span>
+        <button
+          onClick={() => setPageNumber(Math.min(numPages || 1, pageNumber + 1))}
+          disabled={pageNumber === numPages}
+        >
+          Next Page
+        </button>
+      </div>
+
+      <div style={{ display: 'inline-block', border: '1px solid black'}}>
+        <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
+          <Page pageNumber={pageNumber} customTextRenderer={textRenderer} />
+        </Document>
+      </div>
+    </div>
+  );
 };
 
 export default PDFViewer;

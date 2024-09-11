@@ -1,4 +1,8 @@
 /* src/components/PDFViewer.css */
+mark {
+  background-color: yellow;
+  color: black;
+}
 
 .pdf-viewer {
   margin: 20px auto;
@@ -16,15 +20,7 @@
   height: auto;
 }
 
-.pdf-viewer input {
-  padding: 5px;
-}
-
-.pdf-viewer button {
-  margin-left: 10px;
-  padding: 5px 10px;
-}
-
-.pdf-viewer span {
-  margin-left: 10px;
+.react-pdf__Page__textContent {
+  opacity: 1;
+  pointer-events: none;
 }

@@ -1,3 +1,5 @@
+// PDFViewer.tsx
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -21,8 +23,25 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
   const [searchText, setSearchText] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState<number>(-1);
+  const [error, setError] = useState<string | null>(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
   const pdfDocument = useRef<pdfjs.PDFDocumentProxy | null>(null);
+
+  useEffect(() => {
+    const fetchPdf = async () => {
+      try {
+        const response = await fetch(pdfUrl);
+        const blob = await response.blob();
+        setPdfBlob(blob);
+      } catch (error) {
+        console.error('Error fetching PDF:', error);
+        setError('Error loading PDF. Please try again.');
+      }
+    };
+
+    fetchPdf();
+  }, [pdfUrl]);
 
   const onDocumentLoadSuccess = useCallback((document: pdfjs.PDFDocumentProxy) => {
     setNumPages(document.numPages);
@@ -118,31 +137,53 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
 
   return (
     <div className="pdf-viewer">
-      <div style={{ marginBottom: '20px' }}>
+      <div className="search-container">
         <input
           type="text"
           placeholder="Search in PDF"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          style={{ marginRight: '10px' }}
+          className="search-input"
         />
-        <button onClick={handleSearch}>Search</button>
-        <span>
+        <button onClick={handleSearch} className="search-button">Search</button>
+      </div>
+
+      <div className="search-results">
+        <div className="search-navigation">
+          <button onClick={() => navigateSearchResult('prev')} disabled={searchResults.length === 0} className="nav-button">
+            &lt;
+          </button>
+          <span>
           {searchResults.length > 0
             ? `${currentResultIndex + 1} of ${searchResults.length} results`
             : 'No results'}
         </span>
-        <button onClick={() => navigateSearchResult('prev')} disabled={searchResults.length === 0}>
-          Previous Result
-        </button>
-        <button onClick={() => navigateSearchResult('next')} disabled={searchResults.length === 0}>
-          Next Result
-        </button>
+          <button onClick={() => navigateSearchResult('next')} disabled={searchResults.length === 0} className="nav-button">
+            &gt;
+          </button>
+        </div>
       </div>
 
-      <div>
-        <button onClick={() => setPageNumber(Math.max(1, pageNumber - 1))} disabled={pageNumber === 1}>
-          Previous Page
+      {error && <div style={{color: 'red'}}>{error}</div>}
+      {pdfBlob && (
+        <div className="pdf-container">
+          <Document file={pdfBlob} onLoadSuccess={onDocumentLoadSuccess}>
+          <Page 
+                key={`page_${pageNumber}`} 
+                pageNumber={pageNumber} 
+                customTextRenderer={textRenderer}
+                width={Math.min(800, document.documentElement.clientWidth - 40)}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+            />
+
+          </Document>
+        </div>
+      )}
+
+      <div className="page-navigation">
+        <button onClick={() => setPageNumber(Math.max(1, pageNumber - 1))} disabled={pageNumber === 1} className="nav-button">
+          &lt;
         </button>
         <span>
           Page {pageNumber} of {numPages}
@@ -150,21 +191,13 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
         <button
           onClick={() => setPageNumber(Math.min(numPages || 1, pageNumber + 1))}
           disabled={pageNumber === numPages}
+          className="nav-button"
         >
-          Next Page
+          &gt;
         </button>
-      </div>
-
-      <div style={{ display: 'inline-block', border: '1px solid black'}}>
-        <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
-          <Page key={`page_${pageNumber}`} pageNumber={pageNumber} customTextRenderer={textRenderer} />
-        </Document>
       </div>
     </div>
   );
 };
 
 export default PDFViewer;
-
-
-

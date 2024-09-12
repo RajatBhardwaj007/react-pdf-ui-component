@@ -1,32 +1,113 @@
-/* src/components/PDFViewer.css */
-mark.current-match {
-  background-color: #FFD700; /* Gold */
-  color: #000000; /* Black */
-}
-
-
-mark.other-match {
-  background-color: #ffffb3; /* Light yellow for other matches */
-  color: black;
-}
-
 .pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin: 20px auto;
-  width: 80%;
-  text-align: center;
+  width: 100%;
+  max-width: 1200px;
+  height: 100vh;
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
-.pdf-viewer .react-pdf__Page {
+.search-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.search-input {
+  padding: 5px;
+  margin-right: 10px;
+  width: 200px;
+}
+
+.search-button {
+  padding: 5px 10px;
+}
+
+.search-results {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.search-navigation {
+  margin-left: 10px;
+}
+
+.nav-button {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  cursor: pointer;
+  margin: 0 5px;
+}
+
+.nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdf-container {
+  border: 1px solid black;
+  margin-bottom: 10px;
+  width: 100%;
+  height: calc(100vh - 200px);
+  overflow: auto;
   display: flex;
   justify-content: center;
 }
 
-.pdf-viewer .react-pdf__Page__canvas {
+.page-navigation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.react-pdf__Page {
   max-width: 100%;
-  height: auto;
+  max-height: 100%;
+  position: relative;
+}
+
+.react-pdf__Page__canvas {
+  max-width: 100%;
+  height: auto !important;
 }
 
 .react-pdf__Page__textContent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   opacity: 1;
   pointer-events: none;
+}
+
+.react-pdf__Page__textContent mark {
+  opacity: 1;
+}
+
+mark.current-match {
+  background-color: #FFD700 !important; /* Gold */
+  color: #000000 !important; /* Black */
+}
+
+mark.other-match {
+  background-color: #FFF59D !important; /* Light Yellow */
+  color: #000000 !important; /* Black */
 }

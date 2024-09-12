@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -29,20 +29,21 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
     pdfDocument.current = document;
   }, []);
 
-  const highlightPattern = (text: string, pattern: string) => {
+  const highlightPattern = useCallback((text: string, pattern: string) => {
     if (!pattern.trim()) return text;
     const regex = new RegExp(`(${pattern})`, 'gi');
     return text.replace(regex, '<mark>$1</mark>');
-  };
+  }, []);
 
   const textRenderer = useCallback(
     (textItem: any) => highlightPattern(textItem.str, searchText),
-    [searchText]
+    [searchText, highlightPattern]
   );
 
   const handleSearch = async () => {
     if (!pdfDocument.current || !searchText.trim()) {
       setSearchResults([]);
+      setCurrentResultIndex(-1);
       return;
     }
 
@@ -61,9 +62,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
     }
 
     setSearchResults(results);
-    setCurrentResultIndex(results.length > 0 ? 0 : -1);
     if (results.length > 0) {
+      setCurrentResultIndex(0);
       setPageNumber(results[0].pageIndex);
+    } else {
+      setCurrentResultIndex(-1);
     }
   };
 
@@ -80,6 +83,38 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
     setCurrentResultIndex(newIndex);
     setPageNumber(searchResults[newIndex].pageIndex);
   };
+
+  const highlightCurrentResult = useCallback(() => {
+    const textLayer = document.querySelector('.react-pdf__Page__textContent');
+    if (!textLayer) return;
+
+    const marks = textLayer.querySelectorAll('mark');
+    const currentResult = searchResults[currentResultIndex];
+
+    marks.forEach((mark, index) => {
+      if (currentResult && currentResult.pageIndex === pageNumber) {
+        const resultsOnCurrentPage = searchResults.filter(r => r.pageIndex === pageNumber);
+        const indexOnCurrentPage = resultsOnCurrentPage.findIndex(r => r === currentResult);
+        
+        if (index === indexOnCurrentPage) {
+          mark.classList.add('current-match');
+          mark.classList.remove('other-match');
+          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          mark.classList.remove('current-match');
+          mark.classList.add('other-match');
+        }
+      } else {
+        mark.classList.remove('current-match');
+        mark.classList.add('other-match');
+      }
+    });
+  }, [currentResultIndex, pageNumber, searchResults]);
+
+  useEffect(() => {
+    const timer = setTimeout(highlightCurrentResult, 100);
+    return () => clearTimeout(timer);
+  }, [highlightCurrentResult, pageNumber]);
 
   return (
     <div className="pdf-viewer">
@@ -122,7 +157,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
 
       <div style={{ display: 'inline-block', border: '1px solid black'}}>
         <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
-          <Page pageNumber={pageNumber} customTextRenderer={textRenderer} />
+          <Page key={`page_${pageNumber}`} pageNumber={pageNumber} customTextRenderer={textRenderer} />
         </Document>
       </div>
     </div>
@@ -130,3 +165,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
 };
 
 export default PDFViewer;
+
+
+

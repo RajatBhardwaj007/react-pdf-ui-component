@@ -1,6 +1,12 @@
 /* src/components/PDFViewer.css */
-mark {
-  background-color: yellow;
+mark.current-match {
+  background-color: #FFD700; /* Gold */
+  color: #000000; /* Black */
+}
+
+
+mark.other-match {
+  background-color: #ffffb3; /* Light yellow for other matches */
   color: black;
 }
 
